@@ -5,11 +5,11 @@ from datetime import datetime
 
 app = FastAPI()
 
-url = "postgresql://postgres:uGXkacFOMEuxkRdMEiUecmBVYSmFPorq@hopper.proxy.rlwy.net:14163/railway"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-DATABASE_URL = os.environ.get(url)
 
-conn = psycopg2.connect(DATABASE_URL)
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
 
 
 @app.get("/")
@@ -21,23 +21,35 @@ def health():
 def check_user(data: dict):
     username = data.get("username")
 
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT plan, is_active, subscription_end FROM users WHERE username=%s",
-        (username,)
-    )
+    if not username:
+        return {"status": "invalid"}
 
-    row = cur.fetchone()
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
 
-    if not row:
-        return {"status": "not_found"}
+        cur.execute(
+            "SELECT plan, is_active, subscription_end FROM users WHERE username=%s",
+            (username,)
+        )
 
-    plan, is_active, sub_end = row
+        row = cur.fetchone()
 
-    if not is_active:
-        return {"status": "blocked"}
+        cur.close()
+        conn.close()
 
-    if sub_end and sub_end < datetime.utcnow():
-        return {"status": "expired"}
+        if not row:
+            return {"status": "not_found"}
 
-    return {"status": "active", "plan": plan}
+        plan, is_active, sub_end = row
+
+        if not is_active:
+            return {"status": "blocked"}
+
+        if sub_end and sub_end < datetime.utcnow():
+            return {"status": "expired"}
+
+        return {"status": "active", "plan": plan}
+
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
