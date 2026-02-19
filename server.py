@@ -6,7 +6,9 @@ from datetime import datetime
 app = FastAPI()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-print("DATABASE_URL:", DATABASE_URL)
+
+print("DATABASE_URL ENV:", os.environ)
+print("DATABASE_URL VALUE:", os.getenv("DATABASE_URL"))
 
 
 def get_connection():
