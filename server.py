@@ -32,19 +32,22 @@ def check_user(data: dict):
         cur = conn.cursor()
 
         cur.execute(
-            "SELECT plan, is_active, subscription_end FROM users WHERE username=%s",
+            """
+            SELECT plan, is_active, subscription_end, allow_demo
+            FROM users
+            WHERE username=%s
+            """,
             (username,)
         )
 
         row = cur.fetchone()
-
         cur.close()
         conn.close()
 
         if not row:
             return {"status": "not_found"}
 
-        plan, is_active, sub_end = row
+        plan, is_active, sub_end, allow_demo = row
 
         if not is_active:
             return {"status": "blocked"}
@@ -52,7 +55,12 @@ def check_user(data: dict):
         if sub_end and sub_end < datetime.utcnow():
             return {"status": "expired"}
 
-        return {"status": "active", "plan": plan}
+        return {
+            "status": "active",
+            "plan": plan,
+            "allow_demo": allow_demo
+        }
 
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
