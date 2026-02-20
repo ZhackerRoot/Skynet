@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 
 app = FastAPI()
 
+TRIAL_DURATION = 600  # 10 min
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
@@ -19,10 +21,22 @@ def get_connection():
 def health():
     return {"status": "server running"}
 
+def create_admin():
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
+    cur.execute("""
+        INSERT INTO users (username, plan, allow_demo, is_active)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (username) DO NOTHING
+    """, ("your_email_here", "admin", True, True))
 
+    conn.commit()
+    cur.close()
+    conn.close()
 
-TRIAL_DURATION = 600  # 10 min
+create_admin()
+
 
 @app.post("/verify")
 def verify(data: dict):
