@@ -8,7 +8,7 @@ app = FastAPI()
 DATABASE_URL = os.environ.get("DATABASE_PUBLIC_URL")
 
 
-print("DATABASE_URL VALUE:", os.getenv("DATABASE_URL"))
+print("DATABASE_URL VALUE:", os.getenv("DATABASE_PUBLIC_URL"))
 
 
 def get_connection():
