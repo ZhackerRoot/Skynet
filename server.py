@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 import psycopg2
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
@@ -20,39 +20,46 @@ def health():
     return {"status": "server running"}
 
 
-@app.post("/check_user")
-def check_user(data: dict):
+
+
+TRIAL_DURATION = 600  # 10 min
+
+@app.post("/verify")
+def verify(data: dict):
     username = data.get("username")
 
     if not username:
         return {"status": "invalid"}
 
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
 
-        cur.execute(
-            """
-            SELECT plan, is_active, subscription_end, allow_demo
-            FROM users
-            WHERE username=%s
-            """,
-            (username,)
-        )
+    cur.execute("""
+        SELECT plan, is_active, subscription_end,
+               allow_demo, trial_start, trial_used
+        FROM users
+        WHERE username=%s
+    """, (username,))
 
-        row = cur.fetchone()
+    row = cur.fetchone()
+
+    if not row:
         cur.close()
         conn.close()
+        return {"status": "not_found"}
 
-        if not row:
-            return {"status": "not_found"}
+    plan, is_active, sub_end, allow_demo, trial_start, trial_used = row
 
-        plan, is_active, sub_end, allow_demo = row
+    # BLOCKED
+    if not is_active:
+        return {"status": "blocked"}
 
-        if not is_active:
-            return {"status": "blocked"}
+    now = datetime.utcnow()
 
-        if sub_end and sub_end < datetime.utcnow():
+    # VIP / STANDARD / ADMIN
+    if plan in ["vip", "standard", "admin"]:
+
+        if sub_end and sub_end < now:
             return {"status": "expired"}
 
         return {
@@ -61,6 +68,40 @@ def check_user(data: dict):
             "allow_demo": allow_demo
         }
 
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+    # ===== TRIAL LOGIC =====
+    if plan == "none":
+
+        # Trial hali boshlanmagan
+        if not trial_start:
+            trial_start = now
+            cur.execute("""
+                UPDATE users
+                SET trial_start=%s
+                WHERE username=%s
+            """, (trial_start, username))
+            conn.commit()
+
+        # Trial vaqt hisoblash
+        elapsed = (now - trial_start).total_seconds()
+
+        if elapsed > TRIAL_DURATION:
+            cur.execute("""
+                UPDATE users
+                SET trial_used=TRUE
+                WHERE username=%s
+            """, (username,))
+            conn.commit()
+
+            return {"status": "trial_expired"}
+
+        remaining = TRIAL_DURATION - elapsed
+
+        return {
+            "status": "trial",
+            "remaining": int(remaining)
+        }
+
+    cur.close()
+    conn.close()
+
 
