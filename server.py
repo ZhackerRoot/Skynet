@@ -5,6 +5,10 @@ from datetime import datetime
 import stripe
 from fastapi import Request
 
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
 
 app = FastAPI()
 
@@ -141,3 +145,56 @@ def heartbeat(data: dict):
         return {"status": "expired"}
 
     return {"status": "ok"}
+
+
+@app.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, WEBHOOK_SECRET
+        )
+    except Exception as e:
+        return {"error": str(e)}
+
+    if event["type"] == "checkout.session.completed":
+
+        session = event["data"]["object"]
+
+        email = session["customer_details"]["email"]
+        price_id = session["metadata"].get("plan")
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # PLAN ANIQLASH
+        if price_id == "standard":
+            plan = "standard"
+            allow_demo = False
+        elif price_id == "vip":
+            plan = "vip"
+            allow_demo = True
+        else:
+            plan = "standard"
+            allow_demo = False
+
+        subscription_end = datetime.utcnow() + timedelta(days=30)
+
+        cur.execute("""
+            UPDATE users
+            SET plan=%s,
+                allow_demo=%s,
+                subscription_end=%s,
+                is_active=TRUE
+            WHERE username=%s
+        """, (plan, allow_demo, subscription_end, email))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    return {"status": "success"}
+
