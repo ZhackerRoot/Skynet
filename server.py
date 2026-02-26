@@ -224,12 +224,42 @@ def create_request(data: dict, x_bot_key: str = Header(None)):
 
     return {"status":"ok"}
 
-# Admin Vip
-@app.post("/admin/vip")
-def give_vip(data: dict, x_admin_key: str = Header(None)):
+# Admin
+@app.get("/admin/users")
+def admin_users(x_admin_key: str = Header(None)):
 
     if x_admin_key != ADMIN_KEY:
-        return {"status":"unauthorized"}
+        return {"error": "unauthorized"}
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT username, plan, is_active
+        FROM users
+        ORDER BY username
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "username": r[0],
+            "plan": r[1],
+            "active": r[2],
+        }
+        for r in rows
+    ]
+
+# Admin Vip
+@app.post("/admin/vip")
+def admin_vip(data: dict, x_admin_key: str = Header(None)):
+
+    if x_admin_key != ADMIN_KEY:
+        return {"error": "unauthorized"}
 
     username = data["username"]
 
@@ -239,9 +269,8 @@ def give_vip(data: dict, x_admin_key: str = Header(None)):
     cur.execute("""
         UPDATE users
         SET plan='vip',
-            allow_demo=TRUE,
             is_active=TRUE,
-            subscription_end=NOW()+INTERVAL '30 days'
+            allow_demo=TRUE
         WHERE username=%s
     """,(username,))
 
@@ -253,10 +282,10 @@ def give_vip(data: dict, x_admin_key: str = Header(None)):
 
 # Admin Standard
 @app.post("/admin/standard")
-def give_standard(data: dict, x_admin_key: str = Header(None)):
+def admin_standard(data: dict, x_admin_key: str = Header(None)):
 
     if x_admin_key != ADMIN_KEY:
-        return {"status":"unauthorized"}
+        return {"error": "unauthorized"}
 
     username = data["username"]
 
@@ -266,9 +295,8 @@ def give_standard(data: dict, x_admin_key: str = Header(None)):
     cur.execute("""
         UPDATE users
         SET plan='standard',
-            allow_demo=FALSE,
             is_active=TRUE,
-            subscription_end=NOW()+INTERVAL '30 days'
+            allow_demo=FALSE
         WHERE username=%s
     """,(username,))
 
@@ -280,21 +308,27 @@ def give_standard(data: dict, x_admin_key: str = Header(None)):
 
 # Block User
 @app.post("/admin/block")
-def block_user(data: dict, x_admin_key: str = Header(None)):
+def admin_block(data: dict, x_admin_key: str = Header(None)):
 
     if x_admin_key != ADMIN_KEY:
-        return {"status":"unauthorized"}
+        return {"error": "unauthorized"}
 
-    username=data["username"]
+    username = data["username"]
 
-    conn=get_connection()
-    cur=conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
 
     cur.execute("""
         UPDATE users
         SET is_active=FALSE
         WHERE username=%s
     """,(username,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"status":"blocked"}
 
     conn.commit()
     cur.close()
