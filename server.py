@@ -330,8 +330,3 @@ def admin_block(data: dict, x_admin_key: str = Header(None)):
 
     return {"status":"blocked"}
 
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return {"status":"blocked"}
