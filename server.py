@@ -41,9 +41,9 @@ def health():
 @app.post("/verify")
 def verify(data: dict):
 
-    username = data.get("username")
+    uid = data.get("uid")
 
-    if not username:
+    if not uid:
         return {"status": "invalid"}
 
     conn = get_connection()
@@ -57,8 +57,8 @@ def verify(data: dict):
                trial_start,
                trial_used
         FROM users
-        WHERE username=%s
-    """, (username,))
+        WHERE uid=%s
+    """, (uid,))
 
     row = cur.fetchone()
 
@@ -94,8 +94,8 @@ def verify(data: dict):
             UPDATE users
             SET trial_start=NULL,
                 trial_used=TRUE
-            WHERE username=%s
-        """, (username,))
+            WHERE uid=%s
+        """, (uid,))
         conn.commit()
 
         cur.close()
@@ -124,8 +124,8 @@ def verify(data: dict):
             cur.execute("""
                 UPDATE users
                 SET trial_start=%s
-                WHERE username=%s
-            """, (trial_start, username))
+                WHERE uid=%s
+            """, (trial_start, uid))
             conn.commit()
 
         elapsed = (now - trial_start).total_seconds()
@@ -135,8 +135,8 @@ def verify(data: dict):
             cur.execute("""
                 UPDATE users
                 SET trial_used=TRUE
-                WHERE username=%s
-            """, (username,))
+                WHERE uid=%s
+            """, (uid,))
             conn.commit()
 
             cur.close()
@@ -167,7 +167,7 @@ def verify(data: dict):
 @app.post("/heartbeat")
 def heartbeat(data: dict):
 
-    username = data.get("username")
+    uid = data.get("uid")
 
     conn = get_connection()
     cur = conn.cursor()
@@ -175,8 +175,8 @@ def heartbeat(data: dict):
     cur.execute("""
         SELECT is_active, subscription_end
         FROM users
-        WHERE username=%s
-    """, (username,))
+        WHERE uid=%s
+    """, (uid,))
 
     row = cur.fetchone()
 
@@ -204,7 +204,7 @@ def create_request(data: dict, x_bot_key: str = Header(None)):
     if x_bot_key != BOT_KEY:
         return {"status": "unauthorized"}
 
-    username = data["username"]
+    uid = data["uid"]
     plan = data["plan"]
     payment_method = data.get("payment_method")
 
@@ -212,11 +212,11 @@ def create_request(data: dict, x_bot_key: str = Header(None)):
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO users(username, plan, is_active, payment_method)
+        INSERT INTO users(uid, plan, is_active, payment_method)
         VALUES(%s,'none',FALSE,%s)
-        ON CONFLICT(username)
+        ON CONFLICT(uid)
         DO UPDATE SET payment_method=EXCLUDED.payment_method
-    """,(username, payment_method))
+    """,(uid, payment_method))
 
     conn.commit()
     cur.close()
@@ -235,9 +235,9 @@ def admin_users(x_admin_key: str = Header(None)):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT username, plan, is_active
+        SELECT uid, plan, is_active
         FROM users
-        ORDER BY username
+        ORDER BY uid
     """)
 
     rows = cur.fetchall()
@@ -247,7 +247,7 @@ def admin_users(x_admin_key: str = Header(None)):
 
     return [
         {
-            "username": r[0],
+            "uid": r[0],
             "plan": r[1],
             "active": r[2],
         }
@@ -261,7 +261,7 @@ def admin_vip(data: dict, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_KEY:
         return {"error": "unauthorized"}
 
-    username = data["username"]
+    uid = data["uid"]
 
     conn = get_connection()
     cur = conn.cursor()
@@ -271,8 +271,8 @@ def admin_vip(data: dict, x_admin_key: str = Header(None)):
         SET plan='vip',
             is_active=TRUE,
             allow_demo=TRUE
-        WHERE username=%s
-    """,(username,))
+        WHERE uid=%s
+    """,(uid,))
 
     conn.commit()
     cur.close()
@@ -287,7 +287,7 @@ def admin_standard(data: dict, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_KEY:
         return {"error": "unauthorized"}
 
-    username = data["username"]
+    uid = data["uid"]
 
     conn = get_connection()
     cur = conn.cursor()
@@ -297,8 +297,8 @@ def admin_standard(data: dict, x_admin_key: str = Header(None)):
         SET plan='standard',
             is_active=TRUE,
             allow_demo=FALSE
-        WHERE username=%s
-    """,(username,))
+        WHERE uid=%s
+    """,(uid,))
 
     conn.commit()
     cur.close()
@@ -313,7 +313,7 @@ def admin_block(data: dict, x_admin_key: str = Header(None)):
     if x_admin_key != ADMIN_KEY:
         return {"error": "unauthorized"}
 
-    username = data["username"]
+    uid = data["uid"]
 
     conn = get_connection()
     cur = conn.cursor()
@@ -321,12 +321,11 @@ def admin_block(data: dict, x_admin_key: str = Header(None)):
     cur.execute("""
         UPDATE users
         SET is_active=FALSE
-        WHERE username=%s
-    """,(username,))
+        WHERE uid=%s
+    """,(uid,))
 
     conn.commit()
     cur.close()
     conn.close()
 
     return {"status":"blocked"}
-
