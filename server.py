@@ -13,8 +13,9 @@ app = FastAPI()
 DATABASE_URL = os.getenv("DATABASE_URL")
 print("Database: ", DATABASE_URL)
 ADMIN_KEY = os.getenv("ADMIN_KEY")
+print("Admin_key: ", ADMIN_KEY)
 BOT_KEY = os.getenv("BOT_KEY")
-
+print("Bot_key: ", BOT_KEY)
 
 
 TRIAL_DURATION = 600  # 10 min
