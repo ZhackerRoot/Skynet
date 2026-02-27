@@ -63,10 +63,32 @@ def verify(data: dict):
 
     row = cur.fetchone()
 
+# ================= NEW USER AUTO CREATE =================
     if not row:
+
+        trial_start = datetime.utcnow()
+
+        cur.execute("""
+            INSERT INTO users(
+                uid,
+                plan,
+                is_active,
+                allow_demo,
+                trial_start,
+                trial_used
+            )
+            VALUES(%s,'none',TRUE,FALSE,%s,FALSE)
+        """,(uid, trial_start))
+
+        conn.commit()
+
         cur.close()
         conn.close()
-        return {"status": "not_found"}
+
+        return {
+            "status": "trial",
+            "remaining": TRIAL_DURATION
+        }
 
     plan, is_active, sub_end, allow_demo, trial_start, trial_used = row
     now = datetime.utcnow()
