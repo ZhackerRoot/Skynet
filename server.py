@@ -258,24 +258,37 @@ def admin_users(x_admin_key: str = Header(None)):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT uid, plan, is_active
+        SELECT
+            uid,
+            plan,
+            is_active,
+            allow_demo,
+            trial_start,
+            trial_used,
+            subscription_end
         FROM users
-        ORDER BY uid
+        ORDER BY trial_start DESC NULLS LAST
     """)
 
     rows = cur.fetchall()
 
-    cur.close()
-    conn.close()
+    users = []
 
-    return [
-        {
+    for r in rows:
+        users.append({
             "uid": r[0],
             "plan": r[1],
             "active": r[2],
-        }
-        for r in rows
-    ]
+            "allow_demo": r[3],
+            "trial_start": str(r[4]),
+            "trial_used": r[5],
+            "subscription_end": str(r[6]),
+        })
+
+    cur.close()
+    conn.close()
+
+    return users
 
 # Admin Vip
 @app.post("/admin/vip")
@@ -352,3 +365,47 @@ def admin_block(data: dict, x_admin_key: str = Header(None)):
     conn.close()
 
     return {"status":"blocked"}
+
+@app.post("/admin/delete")
+def delete_user(data: dict, x_admin_key: str = Header(None)):
+
+    if x_admin_key != ADMIN_KEY:
+        return {"error": "unauthorized"}
+
+    uid = data["uid"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM users WHERE uid=%s", (uid,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    return {"status": "deleted"}
+
+@app.post("/admin/cleanup")
+def cleanup_users(x_admin_key: str = Header(None)):
+
+    if x_admin_key != ADMIN_KEY:
+        return {"error": "unauthorized"}
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        DELETE FROM users
+        WHERE
+            plan='none'
+            AND trial_used=TRUE
+            AND subscription_end IS NULL
+    """)
+
+    deleted = cur.rowcount
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"deleted": deleted}
