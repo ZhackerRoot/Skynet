@@ -306,7 +306,8 @@ def admin_vip(data: dict, x_admin_key: str = Header(None)):
         UPDATE users
         SET plan='vip',
             is_active=TRUE,
-            allow_demo=TRUE
+            allow_demo=TRUE,
+            subscription_end = NOW() + INTERVAL '30 days'
         WHERE uid=%s
     """,(uid,))
 
@@ -332,7 +333,8 @@ def admin_standard(data: dict, x_admin_key: str = Header(None)):
         UPDATE users
         SET plan='standard',
             is_active=TRUE,
-            allow_demo=FALSE
+            allow_demo=FALSE,
+            subscription_end = NOW() + INTERVAL '30 days'
         WHERE uid=%s
     """,(uid,))
 
