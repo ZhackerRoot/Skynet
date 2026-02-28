@@ -196,7 +196,10 @@ def heartbeat(data: dict):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT is_active, subscription_end
+        SELECT plan,
+               is_active,
+               subscription_end,
+               allow_demo
         FROM users
         WHERE uid=%s
     """, (uid,))
@@ -209,7 +212,7 @@ def heartbeat(data: dict):
     if not row:
         return {"status": "not_found"}
 
-    is_active, sub_end = row
+    plan, is_active, sub_end, allow_demo = row
     now = datetime.utcnow()
 
     if not is_active:
@@ -218,8 +221,11 @@ def heartbeat(data: dict):
     if sub_end and sub_end < now:
         return {"status": "expired"}
 
-    return {"status": "ok"}
-
+    return {
+        "status": "ok",
+        "plan": plan,
+        "allow_demo": allow_demo
+    }
 
 @app.post("/create_user_request")
 def create_request(data: dict, x_bot_key: str = Header(None)):
