@@ -18,7 +18,7 @@ BOT_KEY = os.getenv("BOT_KEY")
 print("Bot_key: ", BOT_KEY)
 
 
-TRIAL_DURATION = 600  # 10 min
+TRIAL_DURATION = 3000  # 10 min
 
 
 # =============================
